@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de Bord Capteurs Agricoles</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Global Styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .dashboard-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .dashboard-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .connection-status {
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+        }
+
+        .connection-status-connecting {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+
+        .connection-status-connected {
+            background-color: #d1fae5;
+            color: #064e3b;
+        }
+
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 768px) {
+            .sensor-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .dashboard-title {
+                font-size: 1.875rem;
+            }
+        }
+
+        /* Sensor Card Styles */
+        .sensor-card {
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            color: white;
+            padding: 1.5rem;
+            position: relative;
+        }
+
+        .sensor-card-icon {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            opacity: 0.7;
+        }
+
+        .sensor-card-title {
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .sensor-card-value {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            margin-top: 1rem;
+        }
+
+        .sensor-card-value-number {
+            font-size: 1.875rem;
+            font-weight: bold;
+        }
+
+        .sensor-card-value-unit {
+            font-size: 1.25rem;
+            margin-left: 0.25rem;
+        }
+
+        /* Sensor History Table Styles */
+        .sensor-history-container {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+
+        .sensor-history-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 0.75rem;
+        }
+
+        .sensor-history-table {
+            width: 100%;
+            font-size: 0.875rem;
+            color: #4b5563;
+        }
+
+        .sensor-history-table thead {
+            background-color: #f9fafb;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            color: #374151;
+            position: sticky;
+            top: 0;
+        }
+
+        .sensor-history-table tbody tr {
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .sensor-history-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .sensor-history-table tbody tr:hover {
+            background-color: #f9fafb;
+        }
+
+        .sensor-history-empty {
+            text-align: center;
+            color: #9ca3af;
+            padding: 0.5rem;
+        }
+
+        /* Gradient Backgrounds */
+        .gradient-blue {
+            background: linear-gradient(to right, #3b82f6, #2563eb);
+        }
+
+        .gradient-amber {
+            background: linear-gradient(to right, #d97706, #b45309);
+        }
+
+        .gradient-sky {
+            background: linear-gradient(to right, #0ea5e9, #0284c7);
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">Tableau de Bord Capteurs Agricoles</h1>
+            <div id="connectionStatus" class="connection-status connection-status-connecting">
+                Connexion...
+            </div>
+        </div>
+
+        <div class="sensor-grid">
+            <!-- Distance Sensor -->
+            <div>
+                <div id="distanceSensorCard" class="sensor-card gradient-blue">
+                    <i id="distanceStatusIcon" class="fas fa-wifi sensor-card-icon"></i>
+                    <p class="sensor-card-title">Distance (Ultrason)</p>
+                    <div class="sensor-card-value">
+                        <p class="sensor-card-value-number">
+                            <span id="distanceValue">--</span>
+                            <span class="sensor-card-value-unit">cm</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="sensor-history-container">
+                    <h3 class="sensor-history-title">Historique des Mesures</h3>
+                    <div class="max-h-60 overflow-y-auto">
+                        <table class="sensor-history-table">
+                            <thead>
+                                <tr>
+                                    <th class="p-2">#</th>
+                                    <th class="p-2">Valeur (cm)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="distanceHistoryTable">
+                                <tr>
+                                    <td colspan="2" class="sensor-history-empty">
+                                        Aucune donnée historique
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Soil Temperature Sensor -->
+            <div>
+                <div id="temperatureSensorCard" class="sensor-card gradient-amber">
+                    <i id="temperatureStatusIcon" class="fas fa-wifi sensor-card-icon"></i>
+                    <p class="sensor-card-title">Température du Sol</p>
+                    <div class="sensor-card-value">
+                        <p class="sensor-card-value-number">
+                            <span id="temperatureValue">--</span>
+                            <span class="sensor-card-value-unit">°C</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="sensor-history-container">
+                    <h3 class="sensor-history-title">Historique des Mesures</h3>
+                    <div class="max-h-60 overflow-y-auto">
+                        <table class="sensor-history-table">
+                            <thead>
+                                <tr>
+                                    <th class="p-2">#</th>
+                                    <th class="p-2">Valeur (°C)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="temperatureHistoryTable">
+                                <tr>
+                                    <td colspan="2" class="sensor-history-empty">
+                                        Aucune donnée historique
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Soil Humidity Sensor -->
+            <div>
+                <div id="humiditySensorCard" class="sensor-card gradient-sky">
+                    <i id="humidityStatusIcon" class="fas fa-wifi sensor-card-icon"></i>
+                    <p class="sensor-card-title">Humidité du Sol</p>
+                    <div class="sensor-card-value">
+                        <p class="sensor-card-value-number">
+                            <span id="humidityValue">--</span>
+                            <span class="sensor-card-value-unit">%</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="sensor-history-container">
+                    <h3 class="sensor-history-title">Historique des Mesures</h3>
+                    <div class="max-h-60 overflow-y-auto">
+                        <table class="sensor-history-table">
+                            <thead>
+                                <tr>
+                                    <th class="p-2">#</th>
+                                    <th class="p-2">Valeur (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="humidityHistoryTable">
+                                <tr>
+                                    <td colspan="2" class="sensor-history-empty">
+                                        Aucune donnée historique
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // [Le script JavaScript reste exactement le même que dans l'exemple précédent]
+        const MAX_HISTORY = 10;
+        const socket = io('https://server-cassur.onrender.com');
+
+        const connectionStatus = document.getElementById('connectionStatus');
+        const distanceValue = document.getElementById('distanceValue');
+        const temperatureValue = document.getElementById('temperatureValue');
+        const humidityValue = document.getElementById('humidityValue');
+
+        const distanceHistoryTable = document.getElementById('distanceHistoryTable');
+        const temperatureHistoryTable = document.getElementById('temperatureHistoryTable');
+        const humidityHistoryTable = document.getElementById('humidityHistoryTable');
+
+        const sensorHistory = {
+            distance: [],
+            soilTemperature: [],
+            soilHumidity: []
+        };
+
+        function updateSensorValue(sensorName, value, unit) {
+            document.getElementById(`${sensorName}Value`).textContent = value.toFixed(1);
+        }
+
+        function updateSensorHistory(sensorName, value, unit) {
+            const tableBody = document.getElementById(`${sensorName}HistoryTable`);
+            
+            // Add new value to history
+            sensorHistory[sensorName].unshift(value);
+            if (sensorHistory[sensorName].length > MAX_HISTORY) {
+                sensorHistory[sensorName].pop();
+            }
+
+            // Clear existing table rows
+            tableBody.innerHTML = '';
+
+            // Populate table with history
+            if (sensorHistory[sensorName].length > 0) {
+                sensorHistory[sensorName].forEach((reading, index) => {
+                    const row = tableBody.insertRow();
+                    const indexCell = row.insertCell(0);
+                    const valueCell = row.insertCell(1);
+                    
+                    indexCell.textContent = index + 1;
+                    valueCell.textContent = reading.toFixed(1);
+                });
+            } else {
+                const row = tableBody.insertRow();
+                const cell = row.insertCell(0);
+                cell.colSpan = 2;
+                cell.classList.add('sensor-history-empty');
+                cell.textContent = 'Aucune donnée historique';
+            }
+        }
+
+        socket.on('connect', () => {
+            connectionStatus.textContent = 'Connecté';
+            connectionStatus.classList.remove('connection-status-connecting');
+            connectionStatus.classList.add('connection-status-connected');
+        });
+
+        socket.on('disconnect', () => {
+            connectionStatus.textContent = 'Connexion...';
+            connectionStatus.classList.remove('connection-status-connected');
+            connectionStatus.classList.add('connection-status-connecting');
+        });
+
+        socket.on('sensorData', (data) => {
+            // Update sensor values
+            updateSensorValue('distance', data.distance, 'cm');
+            updateSensorValue('temperature', data.soilTemperature, '°C');
+            updateSensorValue('humidity', data.soilHumidity, '%');
+
+            // Update sensor histories
+            updateSensorHistory('distance', data.distance, 'cm');
+            updateSensorHistory('soilTemperature', data.soilTemperature, '°C');
+            updateSensorHistory('soilHumidity', data.soilHumidity, '%');
+        });
+    </script>
+</body>
+</html>
