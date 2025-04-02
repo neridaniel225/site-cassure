@@ -1,343 +1,2464 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de Bord Capteurs Agricoles</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <style>
-        /* === VOS STYLES ORIGINAUX (intacts) === */
-        body { font-family: 'Arial', sans-serif; background-color: #f3f4f6; margin: 0; padding: 0; line-height: 1.6; }
-        .dashboard-container { max-width: 1280px; margin: 0 auto; padding: 2rem 1rem; }
-        .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-        .dashboard-title { font-size: 1.5rem; font-weight: bold; color: #1f2937; }
-        @media (min-width: 768px) { .dashboard-title { font-size: 1.875rem; } }
-        .connection-status { padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; display: flex; align-items: center; }
-        .connection-status-connecting { background-color: #fef3c7; color: #92400e; }
-        .connection-status-connected { background-color: #d1fae5; color: #064e3b; }
-        .sensor-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
-        @media (min-width: 768px) { .sensor-grid { grid-template-columns: repeat(3, 1fr); } }
-        .sensor-card { border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); color: white; padding: 1.5rem; position: relative; }
-        .sensor-card-icon { position: absolute; top: 0.5rem; right: 0.5rem; opacity: 0.7; }
-        .sensor-card-title { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; }
-        .sensor-card-value { display: flex; align-items: baseline; justify-content: space-between; margin-top: 1rem; }
-        .sensor-card-value-number { font-size: 1.875rem; font-weight: bold; }
-        .sensor-card-value-unit { font-size: 1.25rem; margin-left: 0.25rem; }
-        .sensor-history-container { background-color: white; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); padding: 1rem; margin-top: 1rem; overflow: hidden; }
-        .sensor-history-title { font-size: 1rem; font-weight: 600; color: #4b5563; margin-bottom: 0.75rem; }
-        .sensor-history-table { width: 100%; font-size: 0.875rem; color: #4b5563; border-collapse: collapse; }
-        .sensor-history-table thead { background-color: #f9fafb; text-transform: uppercase; font-size: 0.75rem; color: #374151; }
-        .sensor-history-table th, .sensor-history-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
-        .sensor-history-table tbody tr:last-child td { border-bottom: none; }
-        .sensor-history-table tbody tr:hover { background-color: #f9fafb; }
-        .sensor-history-empty { text-align: center; color: #9ca3af; padding: 0.5rem; }
-        .gradient-blue { background: linear-gradient(to right, #3b82f6, #2563eb); }
-        .gradient-amber { background: linear-gradient(to right, #d97706, #b45309); }
-        .gradient-sky { background: linear-gradient(to right, #0ea5e9, #0284c7); }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tableau de Bord SUBIAKRO</title>
+  <meta name="description" content="Paramètres Hydrometriques / Agrométéorologiques">
+  <!-- Font Awesome pour les icônes -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- Socket.io -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <!-- Chart.js pour les graphiques -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<!-- Plugin Zoom pour Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.0/chartjs-plugin-zoom.min.js"></script>
+<!-- Hammer.js pour la gestion tactile avec le zoom -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+  <!-- SheetJS pour l'export Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-        /* === AJOUTS OPTIMISÉS === */
-        .sensor-card.updated { animation: pulse 0.5s; }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.03); }
-        }
-        .connection-status-error { background-color: #fee2e2; color: #b91c1c; }
-        .icon-error { color: #ef4444 !important; }
-    </style>
+<style>
+    /* Reset et base */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f9fafb;
+      color: #1f2937;
+      min-height: 100vh;
+    }
+
+    
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+    
+    ul {
+      list-style: none;
+    }
+    
+    /* Layout */
+    .flex {
+      display: flex;
+    }
+    
+    .flex-col {
+      flex-direction: column;
+    }
+    
+    .items-center {
+      align-items: center;
+    }
+    
+    .items-start {
+      align-items: flex-start;
+    }
+    
+    .justify-center {
+      justify-content: center;
+    }
+    
+    .justify-between {
+      justify-content: space-between;
+    }
+    
+    .justify-start {
+      justify-content: flex-start;
+    }
+    
+    .gap-2 {
+      gap: 0.5rem;
+    }
+    
+    .gap-4 {
+      gap: 1rem;
+    }
+    
+    .gap-6 {
+      gap: 1.5rem;
+    }
+    
+    .flex-1 {
+      flex: 1;
+    }
+    
+    .flex-shrink-0 {
+      flex-shrink: 0;
+    }
+    
+    /* Grid */
+    .grid {
+      display: grid;
+    }
+    
+    .grid-cols-1 {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+    
+    @media (min-width: 768px) {
+      .md\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+    
+    @media (min-width: 1024px) {
+      .lg\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+    
+    /* Spacing */
+    .p-0 {
+      padding: 0;
+    }
+    
+    .p-2 {
+      padding: 0.5rem;
+    }
+    
+    .p-4 {
+      padding: 1rem;
+    }
+    
+    .p-5 {
+      padding: 1.25rem;
+    }
+    
+    .p-6 {
+      padding: 1.5rem;
+    }
+    
+    .px-3 {
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+    }
+    
+    .px-4 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+    
+    .px-6 {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+    
+    .py-2 {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+    
+    .py-3 {
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+    }
+    
+    .py-4 {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+    
+    .py-6 {
+      padding-top: 1.5rem;
+      padding-bottom: 1.5rem;
+    }
+    
+    .py-8 {
+      padding-top: 2rem;
+      padding-bottom: 2rem;
+    }
+    
+    .pt-6 {
+      padding-top: 1.5rem;
+    }
+    
+    .mb-0 {
+      margin-bottom: 0;
+    }
+    
+    .mb-2 {
+      margin-bottom: 0.5rem;
+    }
+    
+    .mb-3 {
+      margin-bottom: 0.75rem;
+    }
+    
+    .mb-4 {
+      margin-bottom: 1rem;
+    }
+    
+    .mb-6 {
+      margin-bottom: 1.5rem;
+    }
+    
+    .mb-8 {
+      margin-bottom: 2rem;
+    }
+    
+    .ml-0 {
+      margin-left: 0;
+    }
+    
+    .ml-1 {
+      margin-left: 0.25rem;
+    }
+    
+    .ml-3 {
+      margin-left: 0.75rem;
+    }
+    
+    .mr-0 {
+      margin-right: 0;
+    }
+    
+    .mr-2 {
+      margin-right: 0.5rem;
+    }
+    
+    .mr-3 {
+      margin-right: 0.75rem;
+    }
+    
+    .mt-0 {
+      margin-top: 0;
+    }
+    
+    .mt-4 {
+      margin-top: 1rem;
+    }
+    
+    .mt-6 {
+      margin-top: 1.5rem;
+    }
+    
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    /* Typography */
+    .text-xs {
+      font-size: 0.75rem;
+    }
+    
+    .text-sm {
+      font-size: 0.875rem;
+    }
+    
+    .text-base {
+      font-size: 1rem;
+    }
+    
+    .text-lg {
+      font-size: 1.125rem;
+    }
+    
+    .text-xl {
+      font-size: 1.25rem;
+    }
+    
+    .text-2xl {
+      font-size: 1.5rem;
+    }
+    
+    .text-3xl {
+      font-size: 1.875rem;
+    }
+    
+    .font-medium {
+      font-weight: 500;
+    }
+    
+    .font-semibold {
+      font-weight: 600;
+    }
+    
+    .font-bold {
+      font-weight: 700;
+    }
+    
+    .uppercase {
+      text-transform: uppercase;
+    }
+    
+    .tracking-wider {
+      letter-spacing: 0.05em;
+    }
+    
+    .text-left {
+      text-align: left;
+    }
+    
+    .text-center {
+      text-align: center;
+    }
+    
+    .text-right {
+      text-align: right;
+    }
+    
+    /* Colors */
+    .text-white {
+      color: white;
+    }
+    
+    .text-gray-400 {
+      color: #9ca3af;
+    }
+    
+    .text-gray-600 {
+      color: #4b5563;
+    }
+    
+    .text-gray-700 {
+      color: #374151;
+    }
+    
+    .text-gray-800 {
+      color: #1f2937;
+    }
+    
+    .text-blue-600 {
+      color: #2563eb;
+    }
+    
+    .text-emerald-500 {
+      color: #10b981;
+    }
+    
+    .text-emerald-600 {
+      color: #059669;
+    }
+    
+    .text-amber-500 {
+      color: #f59e0b;
+    }
+    
+    .text-amber-600 {
+      color: #d97706;
+    }
+    
+    .text-sky-500 {
+      color: #0ea5e9;
+    }
+    
+    .text-sky-600 {
+      color: #0284c7;
+    }
+    
+    .text-green-800 {
+      color: #166534;
+    }
+    
+    .text-yellow-800 {
+      color: #854d0e;
+    }
+    
+    .bg-white {
+      background-color: white;
+    }
+    
+    .bg-gray-50 {
+      background-color: #f9fafb;
+    }
+    
+    .bg-gray-100 {
+      background-color: #f3f4f6;
+    }
+    
+    .bg-gray-200 {
+      background-color: #e5e7eb;
+    }
+    
+    .bg-blue-50 {
+      background-color: #eff6ff;
+    }
+    
+    .bg-emerald-50 {
+      background-color: #ecfdf5;
+    }
+    
+    .bg-amber-50 {
+      background-color: #fffbeb;
+    }
+    
+    .bg-sky-50 {
+      background-color: #f0f9ff;
+    }
+    
+    .bg-green-100 {
+      background-color: #dcfce7;
+    }
+    
+    .bg-yellow-100 {
+      background-color: #fef9c3;
+    }
+    
+    /* Borders */
+    .border {
+      border-width: 1px;
+      border-style: solid;
+    }
+    
+    .border-b {
+      border-bottom-width: 1px;
+      border-bottom-style: solid;
+    }
+    
+    .border-r {
+      border-right-width: 1px;
+      border-right-style: solid;
+    }
+    
+    .border-gray-100 {
+      border-color: #f3f4f6;
+    }
+    
+    .border-gray-200 {
+      border-color: #e5e7eb;
+    }
+    
+    .border-emerald-500 {
+      border-color: #10b981;
+    }
+    
+    .border-collapse {
+      border-collapse: collapse;
+    }
+    
+    .rounded-lg {
+      border-radius: 0.5rem;
+    }
+    
+    .rounded-xl {
+      border-radius: 0.75rem;
+    }
+    
+    .rounded-full {
+      border-radius: 9999px;
+    }
+    
+    /* Shadows */
+    .shadow-sm {
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+    
+    .shadow-md {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .shadow-lg {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    
+    .shadow-xl {
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+    
+    /* Effects */
+    .transition-all {
+      transition-property: all;
+    }
+    
+    .transition-transform {
+      transition-property: transform;
+    }
+    
+    .transition-shadow {
+      transition-property: box-shadow;
+    }
+    
+    .duration-200 {
+      transition-duration: 200ms;
+    }
+    
+    .duration-300 {
+      transition-duration: 300ms;
+    }
+    
+    .ease-in-out {
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .hover\:-translate-y-1:hover {
+      transform: translateY(-0.25rem);
+    }
+    
+    .hover\:bg-gray-50:hover {
+      background-color: #f9fafb;
+    }
+    
+    .hover\:bg-gray-100:hover {
+      background-color: #f3f4f6;
+    }
+    
+    .hover\:text-gray-800:hover {
+      color: #1f2937;
+    }
+    
+    .hover\:shadow-lg:hover {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    
+    .hover\:shadow-xl:hover {
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+    
+    /* Layout Specifics */
+    .w-full {
+      width: 100%;
+    }
+    
+    .w-10 {
+      width: 2.5rem;
+    }
+    
+    .w-12 {
+      width: 3rem;
+    }
+    
+    .w-9 {
+      width: 2.25rem;
+    }
+    
+    .h-10 {
+      height: 2.5rem;
+    }
+    
+    .h-12 {
+      height: 3rem;
+    }
+    
+    .h-9 {
+      height: 2.25rem;
+    }
+    
+    .h-screen {
+      height: 100vh;
+    }
+    
+    .h-72 {
+      height: 18rem;
+    }
+    
+    .max-h-60 {
+      max-height: 15rem;
+    }
+    
+    .min-h-screen {
+      min-height: 100vh;
+    }
+    
+    .max-w-7xl {
+      max-width: 80rem;
+    }
+    
+    .overflow-hidden {
+      overflow: hidden;
+    }
+    
+    .overflow-y-auto {
+      overflow-y: auto;
+    }
+    
+    .overflow-x-auto {
+      overflow-x: auto;
+    }
+    
+    .whitespace-nowrap {
+      white-space: nowrap;
+    }
+    
+    /* Positionning */
+    .fixed {
+      position: fixed;
+    }
+    
+    .absolute {
+      position: absolute;
+    }
+    
+    .relative {
+      position: relative;
+    }
+    
+    .sticky {
+      position: sticky;
+    }
+    
+    .top-0 {
+      top: 0;
+    }
+    
+    .top-3 {
+      top: 0.75rem;
+    }
+    
+    .right-3 {
+      right: 0.75rem;
+    }
+    
+    .left-0 {
+      left: 0;
+    }
+    
+    .z-50 {
+      z-index: 50;
+    }
+    
+    /* Display */
+    .hidden {
+      display: none;
+    }
+    
+    .block {
+      display: block;
+    }
+    
+    /* Opacity */
+    .opacity-70 {
+      opacity: 0.7;
+    }
+    
+    /* Gradient Backgrounds */
+    .bg-gradient-to-br {
+      background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
+    }
+    
+    .from-blue-500 {
+      --tw-gradient-stops: #3b82f6, var(--tw-gradient-to, rgba(59, 130, 246, 0));
+    }
+    
+    .to-blue-700 {
+      --tw-gradient-to: #1d4ed8;
+    }
+    
+    .from-emerald-500 {
+      --tw-gradient-stops: #10b981, var(--tw-gradient-to, rgba(16, 185, 129, 0));
+    }
+    
+    .to-emerald-700 {
+      --tw-gradient-to: #047857;
+    }
+    
+    .from-amber-500 {
+      --tw-gradient-stops: #f59e0b, var(--tw-gradient-to, rgba(245, 158, 11, 0));
+    }
+    
+    .to-amber-700 {
+      --tw-gradient-to: #b45309;
+    }
+    
+    .from-sky-500 {
+      --tw-gradient-stops: #0ea5e9, var(--tw-gradient-to, rgba(14, 165, 233, 0));
+    }
+    
+    .to-sky-700 {
+      --tw-gradient-to: #0369a1;
+    }
+    
+    /* Responsive */
+    .w-18 {
+      width: 4.5rem;
+    }
+    
+    .ml-18 {
+      margin-left: 4.5rem;
+    }
+    
+    @media (min-width: 768px) {
+      .md\:flex-row {
+        flex-direction: row;
+      }
+      
+      .md\:items-center {
+        align-items: center;
+      }
+      
+      .md\:justify-start {
+        justify-content: flex-start;
+      }
+      
+      .md\:w-72 {
+        width: 18rem;
+      }
+      
+      .md\:ml-72 {
+        margin-left: 18rem;
+      }
+      
+      .w-\[calc\(100\%-4\.5rem\)\] {
+        width: calc(100% - 4.5rem);
+      }
+      
+      .md\:px-0 {
+        padding-left: 0;
+        padding-right: 0;
+      }
+      
+      .md\:px-6 {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+      }
+      
+      .md\:p-6 {
+        padding: 1.5rem;
+      }
+      
+      .md\:mr-3 {
+        margin-right: 0.75rem;
+      }
+      
+      .md\:mr-4 {
+        margin-right: 1rem;
+      }
+      
+      .md\:mx-0 {
+        margin-left: 0;
+        margin-right: 0;
+      }
+      
+      .md\:text-2xl {
+        font-size: 1.5rem;
+      }
+      
+      .md\:text-sm {
+        font-size: 0.875rem;
+      }
+      
+      .md\:hidden {
+        display: none;
+      }
+      
+      .md\:block {
+        display: block;
+      }
+      
+      .md\:inline {
+        display: inline;
+      }
+      
+      .md\:items-start {
+        align-items: flex-start;
+      }
+    }
+    
+    @media (min-width: 1024px) {
+      .lg\:px-8 {
+        padding-left: 2rem;
+        padding-right: 2rem;
+      }
+    }
+   
+    /* Chart Container */
+    .chart-container {
+      width: 100%;
+      height: 100%;
+    }
+   
+  
+    #water-level-chart {
+  width: 100%;
+  height: 300px; /* Hauteur fixe importante */
+  position: relative;
+}
+
+#water-level-chart canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+#chartContainer {
+  height: 100% !important; 
+  width: 100% !important;
+}
+#chartContainer:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+/* Styles pour la modale et les boutons */
+.fixed {
+  position: fixed;
+}
+
+.inset-0 {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.z-50 {
+  z-index: 50;
+}
+
+.bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.max-h-\[90vh\] {
+  max-height: 90vh;
+}
+
+/* Animation pour la modale */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fixed {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Styles pour les boutons */
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button:disabled:hover {
+  transform: none !important;
+}
+/* Styles pour les boutons noirs */
+.btn-gestion {
+  background-color: #000000;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 15px;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn-gestion:hover {
+  background-color: #333333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.btn-gestion:active {
+  transform: translateY(0);
+}
+
+.btn-gestion i {
+  font-size: 16px;
+}
+/* Zoom controls */
+.chart-zoom-controls {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  z-index: 10;
+  display: flex;
+  gap: 5px;
+}
+
+.chart-zoom-btn {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.2s;
+}
+
+.chart-zoom-btn:hover {
+  background-color: #f3f4f6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+}
+
+/* Info zoom */
+.zoom-info {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  font-size: 12px;
+  color: #6b7280;
+  background-color: rgba(255,255,255,0.8);
+  padding: 2px 5px;
+  border-radius: 3px;
+  z-index: 5;
+}
+
+#water-level-chart {
+  width: 100%;
+  height: 350px; /* Augmenter la hauteur */
+  position: relative;
+}
+
+/* Style spécifique pour le bouton Réinitialiser */
+.bg-red-600 {
+  background-color: #dc2626 !important;
+}
+.bg-red-600:hover {
+  background-color: #b91c1c !important;
+}
+/* Conteneur des boutons */
+.flex-wrap {
+  gap: 0.75rem;
+}
+
+/* Adaptation responsive */
+@media (max-width: 640px) {
+  .btn-gestion {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+  .btn-gestion span {
+    display: none;
+  }
+  .btn-gestion i {
+    margin-right: 0;
+    font-size: 1rem;
+  }
+}
+    /* Sidemenu Small Screens */
+    @media (max-width: 767px) {
+      .w-\[calc\(100\%-4\.5rem\)\] {
+        width: calc(100% - 4.5rem);
+      }
+    }
+  </style>
 </head>
 <body>
-    <!-- === STRUCTURE ORIGINALE === -->
-    <div class="dashboard-container">
-        <div class="dashboard-header">
-            <h1 class="dashboard-title">Tableau de Bord Capteurs Agricoles</h1>
-            <div id="connectionStatus" class="connection-status connection-status-connecting">
-                <i class="fas fa-circle-notch fa-spin" style="margin-right: 8px;"></i>
-                Connexion...
-            </div>
-        </div>
-
-        <div class="sensor-grid">
-            <!-- Capteur Distance -->
-            <div>
-                <div id="distanceSensorCard" class="sensor-card gradient-blue">
-                    <i id="distanceStatusIcon" class="fas fa-wifi sensor-card-icon"></i>
-                    <p class="sensor-card-title">Distance (Ultrason)</p>
-                    <div class="sensor-card-value">
-                        <p class="sensor-card-value-number">
-                            <span id="distanceValue">--</span>
-                            <span class="sensor-card-value-unit">cm</span>
-                        </p>
-                    </div>
-                </div>
-                <div class="sensor-history-container">
-                    <h3 class="sensor-history-title">Historique des Mesures</h3>
-                    <div style="max-height: 240px; overflow-y: auto;">
-                        <table class="sensor-history-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Valeur (cm)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="distanceHistoryTable">
-                                <tr>
-                                    <td colspan="2" class="sensor-history-empty">
-                                        Aucune donnée historique
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Capteur Température -->
-            <div>
-                <div id="temperatureSensorCard" class="sensor-card gradient-amber">
-                    <i id="temperatureStatusIcon" class="fas fa-wifi sensor-card-icon"></i>
-                    <p class="sensor-card-title">Température du Sol</p>
-                    <div class="sensor-card-value">
-                        <p class="sensor-card-value-number">
-                            <span id="temperatureValue">--</span>
-                            <span class="sensor-card-value-unit">°C</span>
-                        </p>
-                    </div>
-                </div>
-                <div class="sensor-history-container">
-                    <h3 class="sensor-history-title">Historique des Mesures</h3>
-                    <div style="max-height: 240px; overflow-y: auto;">
-                        <table class="sensor-history-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Valeur (°C)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="temperatureHistoryTable">
-                                <tr>
-                                    <td colspan="2" class="sensor-history-empty">
-                                        Aucune donnée historique
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Capteur Humidité -->
-            <div>
-                <div id="humiditySensorCard" class="sensor-card gradient-sky">
-                    <i id="humidityStatusIcon" class="fas fa-wifi sensor-card-icon"></i>
-                    <p class="sensor-card-title">Humidité du Sol</p>
-                    <div class="sensor-card-value">
-                        <p class="sensor-card-value-number">
-                            <span id="humidityValue">--</span>
-                            <span class="sensor-card-value-unit">%</span>
-                        </p>
-                    </div>
-                </div>
-                <div class="sensor-history-container">
-                    <h3 class="sensor-history-title">Historique des Mesures</h3>
-                    <div style="max-height: 240px; overflow-y: auto;">
-                        <table class="sensor-history-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Valeur (%)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="humidityHistoryTable">
-                                <tr>
-                                    <td colspan="2" class="sensor-history-empty">
-                                        Aucune donnée historique
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="flex min-h-screen bg-gray-50 font-sans">
+    <!-- Side Menu -->
+    <div id="side-menu" class="w-18 md:w-72 bg-white text-gray-700 h-screen fixed left-0 top-0 overflow-y-auto shadow-lg p-0 pt-6 md:p-6 md:pr-4 border-r border-gray-100 z-50 transition-all duration-300 ease-in-out">      <div class="pb-6 mb-6 border-b border-gray-100 flex items-center justify-center md:justify-start px-4 md:px-0">
+        <div class="w-10 h-10 bg-gray-200 border-2 border-emerald-500 rounded-lg mr-0 mx-auto md:mr-3 md:mx-0 flex items-center justify-center text-emerald-500 font-bold text-xl flex-shrink-0">S</div>
+        <h2 class="text-xl font-bold text-gray-800 m-0 hidden md:block">SUBIAKRO</h2>
+      </div>
+      <nav>
+        <ul class="list-none p-0 m-0 flex flex-col gap-2 items-center md:items-start">
+          <li class="w-full">
+            <a href="#" class="nav-link group w-full cursor-pointer flex items-center justify-center p-4 md:justify-start md:py-3 md:px-4 rounded-lg transition-all duration-200 ease-in-out text-gray-600 relative overflow-hidden hover:bg-gray-100 hover:text-gray-800 bg-blue-50 text-blue-600 font-medium" data-section="water-section">
+              <div class="absolute left-0 top-0 h-full w-1 bg-blue-600 rounded-r-sm transition-all duration-200 ease-in-out"></div>
+              <div class="flex items-center justify-center w-9 h-9 rounded-lg mr-0 md:mr-3 bg-white shadow-md transition-all duration-200 ease-in-out flex-shrink-0 text-blue-600 bg-blue-50"> 
+                <i class="fas fa-water"></i>
+              </div>
+              <span class="text-sm hidden md:inline whitespace-nowrap">Niveau et Débit d'eau</span>
+            </a>
+          </li>
+          <li class="w-full">
+            <a href="#" class="nav-link group w-full cursor-pointer flex items-center justify-center p-4 md:justify-start md:py-3 md:px-4 rounded-lg transition-all duration-200 ease-in-out text-gray-600 relative overflow-hidden hover:bg-gray-100 hover:text-gray-800" data-section="temperature-section">
+              <div class="absolute left-0 top-0 h-full w-1 bg-transparent rounded-r-sm transition-all duration-200 ease-in-out"></div>
+              <div class="flex items-center justify-center w-9 h-9 rounded-lg mr-0 md:mr-3 bg-white shadow-sm transition-all duration-200 ease-in-out flex-shrink-0 text-amber-500 bg-amber-50"> 
+                <i class="fas fa-thermometer-half"></i>
+              </div>
+              <span class="text-sm hidden md:inline whitespace-nowrap">Température du Sol</span>
+            </a>
+          </li>
+          <li class="w-full">
+            <a href="#" class="nav-link group w-full cursor-pointer flex items-center justify-center p-4 md:justify-start md:py-3 md:px-4 rounded-lg transition-all duration-200 ease-in-out text-gray-600 relative overflow-hidden hover:bg-gray-100 hover:text-gray-800" data-section="humidity-section">
+              <div class="absolute left-0 top-0 h-full w-1 bg-transparent rounded-r-sm transition-all duration-200 ease-in-out"></div>
+              <div class="flex items-center justify-center w-9 h-9 rounded-lg mr-0 md:mr-3 bg-white shadow-sm transition-all duration-200 ease-in-out flex-shrink-0 text-sky-500 bg-sky-50"> 
+                <i class="fas fa-tint"></i>
+              </div>
+              <span class="text-sm hidden md:inline whitespace-nowrap">Humidité du Sol</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
     </div>
 
-    <script>
-        // ===== CONFIGURATION =====
-        const CONFIG = {
-            SOCKET_URL: 'https://server-cassur.onrender.com',
-            MAX_HISTORY: 15,
-            UPDATE_INTERVAL_MS: 50,
-            RECONNECTION_DELAY: 3000,
-            INITIAL_VALUES: {
-                distance: 0,
-                temperature: 25,
-                humidity: 50
-            }
-        };
+    <!-- Main Content -->
+    <main class="flex-1 ml-18 md:ml-72 w-[calc(100%-4.5rem)] md:w-[calc(100%-18rem)] bg-gray-50 min-h-screen px-4 md:px-6 lg:px-8 box-border transition-all duration-300 ease-in-out">      <div class="max-w-7xl mx-auto py-8 w-full">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 p-5 px-6 bg-white rounded-xl shadow-md border border-gray-100 gap-4">
+          <h1 class="text-xl md:text-2xl font-bold text-gray-800 flex items-center">
+            <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-50 text-blue-600 flex items-center justify-center rounded-xl mr-3 md:mr-4 text-xl md:text-2xl shadow-sm flex-shrink-0">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            Paramètres Hydrometriques / Agrométéorologiques
+          </h1>
+          <div id="connection-status" class="py-2 px-4 rounded-full text-xs md:text-sm font-semibold flex items-center shadow-sm whitespace-nowrap bg-yellow-100 text-yellow-800"> 
+            <i class="fas fa-sync-alt fa-spin mr-2"></i>
+            Connexion...
+          </div>
+        </header>
 
-        // ===== ÉTAT DE L'APPLICATION =====
-        const state = {
-            history: {
-                distance: [],
-                temperature: [],
-                humidity: []
-            },
-            lastUpdate: 0,
-            socket: null
-        };
+        <!-- Sections Container -->
+        <div>
+          <!-- Niveau et Débit d'eau Section -->
+          <section id="water-section" class="py-4 block"> 
+            <h2 class="text-xl font-bold mb-6 text-gray-800 flex items-center">
+              <div class="mr-3 w-10 h-10 flex items-center justify-center rounded-lg text-xl bg-blue-50 text-blue-600 flex-shrink-0">
+                <i class="fas fa-water"></i>
+              </div>
+              Niveau et Débit d'eau
+            </h2>
 
-        // ===== RÉFÉRENCES DOM =====
-        const dom = {
-            status: {
-                container: document.getElementById('connectionStatus'),
-                icon: document.querySelector('#connectionStatus i')
-            },
-            sensors: {
-                distance: {
-                    value: document.getElementById('distanceValue'),
-                    icon: document.getElementById('distanceStatusIcon'),
-                    card: document.getElementById('distanceSensorCard'),
-                    table: document.getElementById('distanceHistoryTable')
-                },
-                temperature: {
-                    value: document.getElementById('temperatureValue'),
-                    icon: document.getElementById('temperatureStatusIcon'),
-                    card: document.getElementById('temperatureSensorCard'),
-                    table: document.getElementById('temperatureHistoryTable')
-                },
-                humidity: {
-                    value: document.getElementById('humidityValue'),
-                    icon: document.getElementById('humidityStatusIcon'),
-                    card: document.getElementById('humiditySensorCard'),
-                    table: document.getElementById('humidityHistoryTable')
-                }
-            }
-        };
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <!-- Canal 1 -->
+              <div class="flex flex-col gap-4">
+                <h3 class="mb-0 text-lg font-semibold text-gray-700">Canal 1</h3>
+                <!-- Distance Sensor (Niveau d'eau) - Canal 1 -->
+                <div class="rounded-xl shadow-lg text-white p-6 relative bg-gradient-to-br from-blue-500 to-blue-700 transition-transform duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl">
+                  <i class="fas fa-wifi absolute top-3 right-3 opacity-70"></i>
+                  <p class="uppercase tracking-wider text-sm font-medium mb-2">Niveau d'eau</p>
+                  <div class="flex items-baseline justify-between mt-4">
+                    <p class="text-3xl font-bold">
+                      <span id="distance1">0.0</span>
+                      <span class="text-lg ml-1">cm</span>
+                    </p>
+                  </div>
+                </div>
+                <!-- Flow Sensor (Débit d'eau) - Canal 1 -->
+                <div class="rounded-xl shadow-lg text-white p-6 relative bg-gradient-to-br from-emerald-500 to-emerald-700 transition-transform duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl">
+                  <i class="fas fa-wifi absolute top-3 right-3 opacity-70"></i>
+                  <p class="uppercase tracking-wider text-sm font-medium mb-2">Débit d'eau</p>
+                  <div class="flex items-baseline justify-between mt-4">
+                    <p class="text-3xl font-bold">
+                      <span id="flow1">0.0</span>
+                      <span class="text-lg ml-1">m³/s</span>
+                    </p>
+                  </div>
+                </div>
+                <!-- Historique Débit - Canal 1 -->
+                <div class="bg-white rounded-xl shadow-md p-5 mt-0 overflow-hidden transition-shadow duration-200 ease-in-out border border-gray-100 hover:shadow-lg">
+                  <h3 class="text-base font-semibold text-gray-600 mb-3">Historique Débit (Canal 1)</h3>
+                  <div class="max-h-60 overflow-y-auto">
+                    <table class="w-full text-sm text-gray-600 border-collapse">
+                      <thead class="bg-gray-50 uppercase text-xs text-gray-700 sticky top-0">
+                        <tr>
+                          <th class="p-2 text-left border-b border-gray-200">#</th>
+                          <th class="p-2 text-left border-b border-gray-200">Valeur (m³/s)</th>
+                        </tr>
+                      </thead>
+                      <tbody id="flow1-history">
+                        <tr>
+                          <td colspan="2" class="text-center text-gray-400 p-2">
+                            Aucune donnée historique
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
 
-        // ===== FONCTIONS UTILITAIRES =====
-        const updateSensorUI = (type, value) => {
-            // Mise à jour valeur
-            dom.sensors[type].value.textContent = value.toFixed(1);
+              <!-- Canal 2 -->
+              <div class="flex flex-col gap-4">
+                <h3 class="mb-0 text-lg font-semibold text-gray-700">Canal 2</h3>
+                <!-- Distance Sensor (Niveau d'eau) - Canal 2 -->
+                <div class="rounded-xl shadow-lg text-white p-6 relative bg-gradient-to-br from-blue-500 to-blue-700 transition-transform duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl">
+                  <i class="fas fa-wifi absolute top-3 right-3 opacity-70"></i>
+                  <p class="uppercase tracking-wider text-sm font-medium mb-2">Niveau d'eau</p>
+                  <div class="flex items-baseline justify-between mt-4">
+                    <p class="text-3xl font-bold">
+                      <span id="distance2">0.0</span>
+                      <span class="text-lg ml-1">cm</span>
+                    </p>
+                  </div>
+                </div>
+                <!-- Flow Sensor (Débit d'eau) - Canal 2 -->
+                <div class="rounded-xl shadow-lg text-white p-6 relative bg-gradient-to-br from-emerald-500 to-emerald-700 transition-transform duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl">
+                  <i class="fas fa-wifi absolute top-3 right-3 opacity-70"></i>
+                  <p class="uppercase tracking-wider text-sm font-medium mb-2">Débit d'eau</p>
+                  <div class="flex items-baseline justify-between mt-4">
+                    <p class="text-3xl font-bold">
+                      <span id="flow2">0.0</span>
+                      <span class="text-lg ml-1">m³/s</span>
+                    </p>
+                  </div>
+                </div>
+                <!-- Historique Débit - Canal 2 -->
+                <div class="bg-white rounded-xl shadow-md p-5 mt-0 overflow-hidden transition-shadow duration-200 ease-in-out border border-gray-100 hover:shadow-lg">
+                  <h3 class="text-base font-semibold text-gray-600 mb-3">Historique Débit (Canal 2)</h3>
+                  <div class="max-h-60 overflow-y-auto">
+                    <table class="w-full text-sm text-gray-600 border-collapse">
+                      <thead class="bg-gray-50 uppercase text-xs text-gray-700 sticky top-0">
+                        <tr>
+                          <th class="p-2 text-left border-b border-gray-200">#</th>
+                          <th class="p-2 text-left border-b border-gray-200">Valeur (m³/s)</th>
+                        </tr>
+                      </thead>
+                      <tbody id="flow2-history">
+                        <tr>
+                          <td colspan="2" class="text-center text-gray-400 p-2">
+                            Aucune donnée historique
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Real-time Water Level Chart -->
+            <div class="bg-white rounded-xl shadow-md p-5 mt-6 border border-gray-100 hover:shadow-lg">
+              <h3 class="text-base font-semibold text-gray-600 mb-4">Graphique Niveau d'eau Temps Réel</h3>
+              <div class="relative w-full h-72"> 
+                <div id="water-level-chart" class="chart-container"></div>
+                <!-- Zoom controls -->
+                <div class="chart-zoom-controls">
+                  <button id="zoom-in-btn" class="chart-zoom-btn" title="Zoomer">
+                    <i class="fas fa-search-plus"></i>
+                  </button>
+                  <button id="zoom-out-btn" class="chart-zoom-btn" title="Dézoomer">
+                    <i class="fas fa-search-minus"></i>
+                  </button>
+                  <button id="reset-zoom-btn" class="chart-zoom-btn" title="Réinitialiser le zoom">
+                    <i class="fas fa-home"></i>
+                  </button>
+                </div>
+                <div class="zoom-info">
+                  <i class="fas fa-info-circle"></i> Utilisez la molette pour zoomer et le clic-déplacer pour naviguer
+                </div>
+              </div>
+            </div>
             
-            // Animation
-            dom.sensors[type].card.classList.add('updated');
-            setTimeout(() => 
-                dom.sensors[type].card.classList.remove('updated'), 500);
-            
-            // Historique
-            state.history[type].unshift(value);
-            if (state.history[type].length > CONFIG.MAX_HISTORY) {
-                state.history[type].pop();
-            }
-            
-            // Mise à jour tableau
-            updateHistoryTable(type);
-        };
+        
 
-        const updateHistoryTable = (type) => {
-            const tableBody = dom.sensors[type].table;
-            const history = state.history[type];
-            
-            if (history.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="2" class="sensor-history-empty">Aucune donnée historique</td></tr>';
-                return;
-            }
-            
-            let html = '';
-            history.forEach((value, index) => {
-                html += `<tr><td>${index + 1}</td><td>${value.toFixed(1)}</td></tr>`;
-            });
-            
-            tableBody.innerHTML = html;
-        };
-
-        const setConnectionStatus = (status) => {
-            const statusMap = {
-                connecting: {
-                    class: 'connection-status-connecting',
-                    icon: 'fa-circle-notch fa-spin',
-                    text: 'Connexion...'
-                },
-                connected: {
-                    class: 'connection-status-connected',
-                    icon: 'fa-check-circle',
-                    text: 'Connecté'
-                },
-                error: {
-                    class: 'connection-status-error',
-                    icon: 'fa-exclamation-triangle',
-                    text: 'Erreur'
-                }
-            };
-            
-            const { class: statusClass, icon, text } = statusMap[status];
-            
-            dom.status.container.className = `connection-status ${statusClass}`;
-            dom.status.icon.className = `fas ${icon}`;
-            dom.status.container.innerHTML = `<i class="fas ${icon}" style="margin-right: 8px;"></i>${text}`;
-            
-            // Mise à jour des icônes WiFi
-            if (status === 'error') {
-                Object.values(dom.sensors).forEach(sensor => {
-                    sensor.icon.classList.add('icon-error');
-                });
-            } else {
-                Object.values(dom.sensors).forEach(sensor => {
-                    sensor.icon.classList.remove('icon-error');
-                });
-            }
-        };
-
-        // ===== INITIALISATION SOCKET.IO =====
-        const initSocket = () => {
-            state.socket = io(CONFIG.SOCKET_URL, {
-                transports: ['websocket'],
-                reconnectionDelay: CONFIG.RECONNECTION_DELAY,
-                forceNew: true
-            });
-
-            state.socket.on('connect', () => {
-                setConnectionStatus('connected');
-                console.log('Connecté au serveur');
-            });
-
-            state.socket.on('disconnect', () => {
-                setConnectionStatus('connecting');
-                console.log('Déconnecté du serveur');
-            });
-
-            state.socket.on('connect_error', (err) => {
-                setConnectionStatus('error');
-                console.error('Erreur de connexion:', err.message);
-            });
-
-            state.socket.on('sensorData', (data) => {
-                const now = Date.now();
-                if (now - state.lastUpdate < CONFIG.UPDATE_INTERVAL_MS) return;
-                state.lastUpdate = now;
+            <!-- Dans la section water-section, après le graphique -->
+            <div class="bg-white rounded-xl shadow-md p-5 mt-6 border border-gray-100">
+                <h3 class="text-base font-semibold text-gray-600 mb-4">Gestion des données</h3>
                 
-                updateSensorUI('distance', data.distance);
-                updateSensorUI('temperature', data.soilTemperature);
-                updateSensorUI('humidity', data.soilHumidity);
-            });
-        };
+                <div class="flex flex-wrap gap-3">
+                  <button onclick="showFullHistory()" class="btn-gestion">
+                    <i class="fas fa-history"></i>
+                    <span>Historique complet</span>
+                  </button>
+                  
+                  
+                   
+                  
+                  <button onclick="exportData('xlsx')" class="btn-gestion">
+                    <i class="fas fa-file-excel"></i>
+                    <span>Exporter Excel</span>
+                  </button>
+                             <!-- Bouton PDF -->
+                  <button onclick="exportToPDF()" class="btn-gestion">
+                                <i class="fas fa-file-pdf"></i>
+                                <span>PDF (.pdf)</span>
+                 </button>
 
-        // ===== INITIALISATION DE L'APPLICATION =====
-        const initApp = () => {
-            // Valeurs par défaut
-            Object.entries(CONFIG.INITIAL_VALUES).forEach(([type, value]) => {
-                updateSensorUI(type, value);
-            });
-            
-            // Initialisation Socket.io
-            initSocket();
-            
-            console.log('Application initialisée');
-        };
+                  <button onclick="if(confirm('Voulez-vous vraiment effacer toutes les données?')) { 
+                                  localStorage.clear(); 
+                                  state.chartData = []; 
+                                  state.dataIndex = 0; 
+                                  renderChart(); 
+                                }" 
+                          class="btn-gestion">
+                    <i class="fas fa-trash-alt"></i>
+                    <span>Réinitialiser</span>
+                  </button>
+                  <button onclick="exportChartImage()" class="btn-gestion">
+                    <i class="fas fa-camera"></i>
+                    <span>Exporter Image</span>
+                  </button>
+                </div>
+              </div>
+          </section>
 
-        // Démarrage
-        document.addEventListener('DOMContentLoaded', initApp);
+          <!-- Température du Sol Section -->
+          <section id="temperature-section" class="py-4 hidden">
+            <h2 class="text-xl font-bold mb-6 text-gray-800 flex items-center">
+              <div class="mr-3 w-10 h-10 flex items-center justify-center rounded-lg text-xl bg-amber-50 text-amber-500 flex-shrink-0">
+                <i class="fas fa-thermometer-half"></i>
+              </div>
+              Température du Sol
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="rounded-xl shadow-lg text-white p-6 relative bg-gradient-to-br from-amber-500 to-amber-700 transition-transform duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl">
+                <i class="fas fa-wifi absolute top-3 right-3 opacity-70"></i>
+                <p class="uppercase tracking-wider text-sm font-medium mb-2">Température du Sol</p>
+                <div class="flex items-baseline justify-between mt-4">
+                  <p class="text-3xl font-bold">
+                    <span id="soilTemperature">0.0</span>
+                    <span class="text-lg ml-1">°C</span>
+                  </p>
+                </div>
+              </div>
+              <div class="bg-white rounded-xl shadow-md p-5 overflow-hidden transition-shadow duration-200 ease-in-out border border-gray-100 hover:shadow-lg">
+                <h3 class="text-base font-semibold text-gray-600 mb-3">Historique Température</h3>
+                <div class="max-h-60 overflow-y-auto">
+                  <table class="w-full text-sm text-gray-600 border-collapse">
+                    <thead class="bg-gray-50 uppercase text-xs text-gray-700 sticky top-0">
+                      <tr>
+                        <th class="p-2 text-left border-b border-gray-200">#</th>
+                        <th class="p-2 text-left border-b border-gray-200">Valeur (°C)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="temperature-history">
+                      <tr>
+                        <td colspan="2" class="text-center text-gray-400 p-2">
+                          Aucune donnée historique
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Humidité du Sol Section -->
+          <section id="humidity-section" class="py-4 hidden">
+            <h2 class="text-xl font-bold mb-6 text-gray-800 flex items-center">
+              <div class="mr-3 w-10 h-10 flex items-center justify-center rounded-lg text-xl bg-sky-50 text-sky-500 flex-shrink-0">
+                <i class="fas fa-tint"></i>
+              </div>
+              Humidité du Sol
+            </h2>
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="rounded-xl shadow-lg text-white p-6 relative bg-gradient-to-br from-sky-500 to-sky-700 transition-transform duration-200 ease-in-out hover:-translate-y-1 hover:shadow-xl">
+                <i class="fas fa-wifi absolute top-3 right-3 opacity-70"></i>
+                <p class="uppercase tracking-wider text-sm font-medium mb-2">Humidité du Sol</p>
+                <div class="flex items-baseline justify-between mt-4">
+                  <p class="text-3xl font-bold">
+                    <span id="soilHumidity">0.0</span>
+                    <span class="text-lg ml-1">%</span>
+                  </p>
+                </div>
+              </div>
+              <div class="bg-white rounded-xl shadow-md p-5 overflow-hidden transition-shadow duration-200 ease-in-out border border-gray-100 hover:shadow-lg">
+                <h3 class="text-base font-semibold text-gray-600 mb-3">Historique Humidité</h3>
+                <div class="max-h-60 overflow-y-auto">
+                  <table class="w-full text-sm text-gray-600 border-collapse">
+                    <thead class="bg-gray-50 uppercase text-xs text-gray-700 sticky top-0">
+                      <tr>
+                        <th class="p-2 text-left border-b border-gray-200">#</th>
+                        <th class="p-2 text-left border-b border-gray-200">Valeur (%)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="humidity-history">
+                      <tr>
+                        <td colspan="2" class="text-center text-gray-400 p-2">
+                          Aucune donnée historique
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- JavaScript -->
+  <script>
+    // Déclaration des variables globales
+      let chart = null;
+      let socket = null;
+      
+      // State variables
+      const state = {
+  activeSection: 'water-section',
+  connectionStatus: 'connecting',
+  sensorData: {
+    distance1: 0,
+    distance2: 0,
+    flow1: 0,
+    flow2: 0,
+    soilTemperature: 0,
+    soilHumidity: 0
+  },
+  sensorHistory: {
+    flow1: [],
+    flow2: [],
+    soilTemperature: [],
+    soilHumidity: []
+  },
+  chartData: [],
+  dataIndex: 0,
+  simulationInterval: null,
+  zoomLevel: 1  // Ajouter cette ligne
+};
+      
+      // Vérification des dépendances
+      function verifyDependencies() {
+  const issues = [];
+  
+  if (typeof io === 'undefined') {
+    console.error("Socket.io non chargé");
+    issues.push("Socket.io non chargé - La connexion en temps réel ne fonctionnera pas");
+  }
+
+  if (typeof Chart === 'undefined') {
+    console.error("Chart.js non chargé");
+    issues.push("Chart.js non chargé - Le graphique ne fonctionnera pas");
+  }
+  
+  if (typeof Chart !== 'undefined' && typeof Chart.plugins === 'object' && !Chart.plugins._plugins.some(p => p.id === 'zoom')) {
+    console.warn("Plugin Zoom pour Chart.js non détecté");
+    issues.push("Plugin Zoom pour Chart.js non chargé - Le zoom du graphique sera limité");
+  }
+
+  if (issues.length > 0) {
+    showError(issues);
+    return false;
+  }
+  return true;
+}
+   
+
+function showError(issues) {
+        const container = document.getElementById('water-level-chart') || document.body;
+        container.innerHTML = `
+          <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <h3 class="font-bold text-red-600 mb-2">
+              <i class="fas fa-exclamation-triangle mr-2"></i>
+              Erreur de chargement
+            </h3>
+            <ul class="list-disc pl-5 text-red-700">
+              ${issues.map(issue => `<li>${issue}</li>`).join('')}
+            </ul>
+            <button onclick="window.location.reload()" 
+                    class="mt-3 bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded">
+              <i class="fas fa-sync-alt mr-2"></i>Recharger
+            </button>
+          </div>
+        `;
+      }
+      
+// Initialiser l'interface utilisateur
+function initUI() {
+  const navLinks = document.querySelectorAll('.nav-link');
+  navLinks.forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const sectionId = link.getAttribute('data-section');
+      setActiveSection(sectionId);
+    });
+  });
+  
+  // Init zoom controls
+  document.getElementById('zoom-in-btn').addEventListener('click', function() {
+    zoomChart(0.2); // Zoom in by 20%
+  });
+  
+  document.getElementById('zoom-out-btn').addEventListener('click', function() {
+    zoomChart(-0.2); // Zoom out by 20%
+  });
+  
+  document.getElementById('reset-zoom-btn').addEventListener('click', function() {
+    resetZoom();
+  });
+}
+
+
+      // Initialiser la connexion socket - FONCTION CORRIGÉE
+  function initSocketConnection() {
+  console.log("Initialisation de la connexion Socket.io...");
+  
+  try {
+    console.log("Tentative de connexion à https://server-cassur.onrender.com");
+    
+    // Arrêter toute connexion existante
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
+    
+    // Initialisation de Socket.io avec des options de base
+    socket = io('https://server-cassur.onrender.com', {
+      reconnectionAttempts: 3,
+      timeout: 5000,
+      transports: ['websocket', 'polling']
+    });
+
+    // Ajouter un log pour suivre la progression
+    console.log("Socket.io initialisé, en attente de connexion...");
+
+    socket.on('connect', () => {
+      console.log('Connecté avec ID:', socket.id);
+      setConnectionStatus('connected');
+      stopSimulation();
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Déconnexion. Raison:', reason);
+      setConnectionStatus('connecting');
+      startSimulationIfDisconnected();
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Erreur de connexion:', error.message);
+      setConnectionStatus('connecting');
+      startSimulationIfDisconnected();
+    });
+
+    socket.on('sensorData', (data) => {
+      console.log('Données reçues:', data);
+      updateSensorData(data);
+    });
+    
+  } catch (e) {
+    console.error("Erreur lors de l'initialisation de Socket.io:", e);
+    startSimulationIfDisconnected();
+  }
+}
+
+
+// Arrêter la simulation
+      function stopSimulation() {
+        if (state.simulationInterval) {
+          clearInterval(state.simulationInterval);
+          state.simulationInterval = null;
+          console.log("Simulation arrêtée");
+        }
+      }
+      
+      // Démarrer la simulation si déconnecté
+      function startSimulationIfDisconnected() {
+        if (state.connectionStatus === 'connecting' && !state.simulationInterval) {
+          simulateDataIfNeeded();
+        }
+      }
+      
+      // Simuler des données si nécessaire
+      function simulateDataIfNeeded() {
+        if (state.connectionStatus !== 'connecting' || state.simulationInterval) return;
+      
+        console.log('Server connection timeout, starting simulation...');
+        
+        // Initialiser le graphique si pas déjà fait
+        if (!chart && state.chartData.length === 0) {
+          updateChartData(30, 25); // Valeurs initiales
+        }
+      
+        state.simulationInterval = setInterval(() => {
+          const mockData = {
+            distance: 30 + Math.random() * 40,
+            soilTemperature: 20 + Math.random() * 10,
+            soilHumidity: 40 + Math.random() * 30
+          };
+          updateSensorData(mockData);
+        }, 2000);
+      
+        const statusEl = document.getElementById('connection-status');
+        statusEl.classList.remove('bg-yellow-100', 'text-yellow-800');
+        statusEl.classList.add('bg-green-100', 'text-green-800');
+        statusEl.innerHTML = '<i class="fas fa-exclamation-circle mr-2"></i>Mode démo';
+      }
+      
+      // Initialiser l'application - FONCTION CORRIGÉE
+      function initApp() {
+        console.log("Initialisation de l'application...");
+        
+        if (!verifyDependencies()) {
+          console.error("Dépendances manquantes");
+          return;
+        }
+      
+        loadFromLocalStorage();
+        initUI();
+        
+        // Initialiser le graphique avec des données par défaut si vide
+        if (state.chartData.length === 0) {
+          console.log("Aucune donnée existante, initialisation avec des valeurs par défaut");
+          updateChartData(0, 0);
+        } else {
+          console.log("Données existantes chargées, rendu du graphique");
+          renderChart();
+        }
+           // Nettoyer les données anciennes au démarrage
+cleanupOldData();
+
+        // Mettre en place un nettoyage périodique (toutes les heures)
+        setInterval(cleanupOldData, 60 * 60 * 1000); // Vérification toutes les heures
+        // Démarrer la connexion Socket.io - CORRIGÉ
+        initSocketConnection();
+        
+        // Démarrer la vérification de connexion après un délai
+        setTimeout(() => {
+          if (state.connectionStatus === 'connecting') {
+            console.log("Connexion toujours en cours, démarrage du mode simulation");
+            simulateDataIfNeeded();
+          }
+        }, 5000);
+      
+        // Nettoyage
+        window.addEventListener('beforeunload', () => {
+          if (socket) socket.disconnect();
+          if (state.simulationInterval) {
+            clearInterval(state.simulationInterval);
+          }
+        });
+      }
+      
+      // Garder toutes les autres fonctions identiques
+      
+      // Fonction pour définir la section active
+      function setActiveSection(sectionId) {
+  state.activeSection = sectionId;
+  
+  Object.keys(elements.sections).forEach(id => {
+    if (id === sectionId) {
+      elements.sections[id].classList.remove('hidden');
+      elements.sections[id].classList.add('block');
+    } else {
+      elements.sections[id].classList.remove('block');
+      elements.sections[id].classList.add('hidden');
+    }
+  });
+  
+  elements.navLinks.forEach(link => {
+    const linkSection = link.getAttribute('data-section');
+    const indicator = link.querySelector('div:first-child');
+    const icon = link.querySelector('div:nth-child(2)');
+    
+    if (linkSection === sectionId) {
+      link.classList.add('font-medium');
+      
+      if (sectionId === 'water-section') {
+        link.classList.add('bg-blue-50', 'text-blue-600');
+        indicator.classList.add('bg-blue-600');
+        icon.classList.add('shadow-md', 'text-blue-600', 'bg-blue-50');
+      } else if (sectionId === 'temperature-section') {
+        link.classList.add('bg-amber-50', 'text-amber-600');
+        indicator.classList.add('bg-amber-600');
+        icon.classList.add('shadow-md', 'text-amber-600', 'bg-amber-50');
+      } else if (sectionId === 'humidity-section') {
+        link.classList.add('bg-sky-50', 'text-sky-600');
+        indicator.classList.add('bg-sky-600');
+        icon.classList.add('shadow-md', 'text-sky-600', 'bg-sky-50');
+      }
+    } else {
+      link.classList.remove('font-medium', 'bg-blue-50', 'text-blue-600', 'bg-amber-50', 'text-amber-600', 'bg-sky-50', 'text-sky-600');
+      indicator.classList.remove('bg-blue-600', 'bg-amber-600', 'bg-sky-600');
+      icon.classList.remove('shadow-md', 'text-blue-600', 'text-amber-600', 'text-sky-600');
+      icon.classList.add('shadow-sm');
+    }
+  });
+  
+  // Nouveau code ajouté: Si on passe à la section eau, mettre à jour le graphique
+  if (sectionId === 'water-section' && state.chartData.length > 0) {
+    setTimeout(() => {
+      renderChart(); // Redessiner le graphique pour qu'il s'adapte à son conteneur
+    }, 10);
+  }
+}     
+      // Fonction pour mettre à jour le statut de connexion
+      function setConnectionStatus(status) {
+        state.connectionStatus = status;
+        
+        if (status === 'connected') {
+          elements.connectionStatus.classList.remove('bg-yellow-100', 'text-yellow-800');
+          elements.connectionStatus.classList.add('bg-green-100', 'text-green-800');
+          elements.connectionStatus.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Connecté';
+        } else {
+          elements.connectionStatus.classList.remove('bg-green-100', 'text-green-800');
+          elements.connectionStatus.classList.add('bg-yellow-100', 'text-yellow-800');
+          elements.connectionStatus.innerHTML = '<i class="fas fa-sync-alt fa-spin mr-2"></i>Connexion...';
+        }
+      }
+      
+      // Autres fonctions nécessaires
+      
+      // Gestion de la persistance des données
+      function loadFromLocalStorage() {
+        try {
+          const savedData = localStorage.getItem('waterMonitoringData');
+          if (savedData) {
+            const parsed = JSON.parse(savedData);
+            state.chartData = parsed.chartData || [];
+            state.dataIndex = parsed.dataIndex || 0;
+            state.sensorHistory = parsed.sensorHistory || {
+              flow1: [], flow2: [], soilTemperature: [], soilHumidity: []
+            };
+          }
+        } catch (e) {
+          console.error("Erreur de lecture du localStorage", e);
+        }
+      }
+      
+      function saveToLocalStorage() {
+        try {
+          const dataToSave = {
+            chartData: state.chartData,
+            dataIndex: state.dataIndex,
+            sensorHistory: state.sensorHistory
+          };
+          localStorage.setItem('waterMonitoringData', JSON.stringify(dataToSave));
+        } catch (e) {
+          console.error("Erreur d'écriture dans le localStorage", e);
+        }
+      }
+      
+      // Fonction pour nettoyer les données plus anciennes que 24h
+function cleanupOldData() {
+  if (state.chartData.length === 0) return;
+  
+  const now = new Date();
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 heures en millisecondes
+  
+  // Filtrer les données pour ne garder que celles des dernières 24h
+  const newChartData = state.chartData.filter(dataPoint => {
+    if (!dataPoint.timestamp) return true; // Garder les points sans horodatage
+    const dataTime = new Date(dataPoint.timestamp);
+    return dataTime >= oneDayAgo;
+  });
+  
+  // Si des données ont été supprimées
+  if (newChartData.length < state.chartData.length) {
+    console.log(`Nettoyage automatique: ${state.chartData.length - newChartData.length} points supprimés (> 24h)`);
+    state.chartData = newChartData;
+    saveToLocalStorage();
+    
+    // Si nous sommes dans la section eau, mettre à jour le graphique
+    if (state.activeSection === 'water-section' && chart) {
+      renderChart();
+    }
+  }
+}
+      // Fonction pour calculer le débit à partir du niveau d'eau
+     // Fonction améliorée pour calculer le débit à partir du niveau d'eau
+function calculateFlow(sensorReading) {
+  // Configuration du capteur
+  const SENSOR_HEIGHT = 50; // Le capteur est placé à 50 cm de la base
+  
+  // Paramètres hydrauliques (à ajuster selon vos besoins spécifiques)
+  const MIN_FLOW = 0.1; // Débit minimal en m³/s
+  const MAX_FLOW = 5.0; // Débit maximal en m³/s
+  const CANAL_WIDTH = 1.5; // Largeur du canal en mètres (valeur exemple)
+  
+  // Calculer la hauteur réelle de l'eau dans le canal
+  // Si le capteur retourne la distance entre lui et la surface de l'eau:
+  const waterHeight = SENSOR_HEIGHT - sensorReading;
+  
+  // Éviter les valeurs négatives (cas où le capteur retourne une valeur > SENSOR_HEIGHT)
+  const effectiveHeight = Math.max(0, waterHeight);
+  
+  // Deux options pour calculer le débit:
+  
+  // Option 1: Utiliser une formule de relation simple (linéaire)
+  // const flow = MIN_FLOW + (effectiveHeight / SENSOR_HEIGHT) * (MAX_FLOW - MIN_FLOW);
+  
+  // Option 2: Utiliser une formule hydraulique plus réaliste (formule de Manning simplifie)
+  // Q = k * A * R^(2/3) * S^(1/2) où:
+  // - k est un coefficient
+  // - A est la section transversale (largeur * hauteur)
+  // - R est le rayon hydraulique (approximé par la hauteur pour un canal large)
+  // - S est la pente du canal (prise comme une constante ici)
+  
+  const COEFFICIENT = 0.6; // Coefficient hydraulique (à calibrer)
+  const SLOPE = 0.002;     // Pente du canal (exemple: 0.2%)
+  
+  // Calcul plus réaliste basé sur les principes hydrauliques
+  if (effectiveHeight > 0) {
+    const area = CANAL_WIDTH * effectiveHeight; // Section transversale
+    const flow = COEFFICIENT * area * Math.pow(effectiveHeight, 2/3) * Math.sqrt(SLOPE);
+    
+    // Limiter le débit entre MIN_FLOW et MAX_FLOW
+    return Math.min(Math.max(flow, MIN_FLOW), MAX_FLOW);
+  } else {
+    return MIN_FLOW; // Débit minimal si pas d'eau détectée
+  }
+}
+
+// Fonction pour déterminer le niveau d'alerte en fonction de la hauteur d'eau
+function getWaterLevelAlert(sensorReading) {
+  // Configuration du capteur
+  const SENSOR_HEIGHT = 50; // Le capteur est placé à 50 cm de la base
+  
+  // Calculer la hauteur réelle de l'eau
+  const waterHeight = SENSOR_HEIGHT - sensorReading;
+  
+  // Définir les seuils d'alerte (à ajuster selon vos besoins)
+  const NORMAL_THRESHOLD = 20;  // Niveau normal: 0-20 cm (vert)
+  const WARNING_THRESHOLD = 35; // Niveau d'avertissement: 20-35 cm (jaune)
+  // Au-dessus de 35 cm: niveau critique (rouge)
+  
+  let status, color, textColor, bgColor;
+  
+  if (waterHeight <= NORMAL_THRESHOLD) {
+    status = "Normal";
+    color = "#10b981"; // vert
+    textColor = "text-emerald-700";
+    bgColor = "bg-emerald-100";
+  } else if (waterHeight <= WARNING_THRESHOLD) {
+    status = "Attention";
+    color = "#f59e0b"; // jaune
+    textColor = "text-amber-700";
+    bgColor = "bg-amber-100";
+  } else {
+    status = "Critique";
+    color = "#ef4444"; // rouge
+    textColor = "text-red-700";
+    bgColor = "bg-red-100";
+  }
+  
+  return {
+    status,     // Texte de statut
+    color,      // Couleur hex pour le graphique
+    textColor,  // Classe Tailwind pour le texte
+    bgColor,    // Classe Tailwind pour l'arrière-plan
+    value: waterHeight // Valeur réelle de la hauteur d'eau
+  };
+}
+
+
+      // Fonction pour mettre à jour les données des capteurs
+      function updateSensorData(data) {
+  // Extraire directement distance1 et distance2 des données
+  const distance1 = data.distance1 || 0;
+  const flow1 = calculateFlow(distance1);
+  
+  const distance2 = data.distance2 || 0;
+  const flow2 = calculateFlow(distance2);
+  
+  const soilTemperature = data.soilTemperature || 0;
+  const soilHumidity = data.soilHumidity || 0;
+
+  state.sensorData = {
+    distance1,
+    distance2,
+    flow1,
+    flow2,
+    soilTemperature,
+    soilHumidity
+  };
+
+  elements.distance1.textContent = distance1.toFixed(1);
+  elements.distance2.textContent = distance2.toFixed(1);
+  elements.flow1.textContent = flow1.toFixed(1);
+  elements.flow2.textContent = flow2.toFixed(1);
+  elements.soilTemperature.textContent = soilTemperature.toFixed(1);
+  elements.soilHumidity.textContent = soilHumidity.toFixed(1);
+
+  updateSensorHistory({
+    flow1,
+    flow2,
+    soilTemperature,
+    soilHumidity
+  });
+
+  updateChartData(distance1, distance2);
+}
+
+
+      // Fonction pour mettre à jour l'historique des capteurs
+      function updateSensorHistory(newData) {
+        state.sensorHistory = {
+          flow1: [newData.flow1, ...state.sensorHistory.flow1].slice(0, MAX_HISTORY),
+          flow2: [newData.flow2, ...state.sensorHistory.flow2].slice(0, MAX_HISTORY),
+          soilTemperature: [newData.soilTemperature, ...state.sensorHistory.soilTemperature].slice(0, MAX_HISTORY),
+          soilHumidity: [newData.soilHumidity, ...state.sensorHistory.soilHumidity].slice(0, MAX_HISTORY)
+        };
+      
+        updateHistoryTable(elements.flow1History, state.sensorHistory.flow1, 'm³/s');
+        updateHistoryTable(elements.flow2History, state.sensorHistory.flow2, 'm³/s');
+        updateHistoryTable(elements.temperatureHistory, state.sensorHistory.soilTemperature, '°C');
+        updateHistoryTable(elements.humidityHistory, state.sensorHistory.soilHumidity, '%');
+      }
+      
+      // Fonction pour mettre à jour les tableaux d'historique
+      function updateHistoryTable(tableElement, dataArray, unit) {
+        if (!dataArray || dataArray.length === 0) {
+          tableElement.innerHTML = `
+            <tr>
+              <td colspan="2" class="text-center text-gray-400 p-2">
+                Aucune donnée historique
+              </td>
+            </tr>
+          `;
+          return;
+        }
+      
+        let html = '';
+        dataArray.forEach((reading, index) => {
+          html += `
+            <tr class="hover:bg-gray-50">
+              <td class="p-2 text-left border-b border-gray-200">${index + 1}</td>
+              <td class="p-2 text-left border-b border-gray-200">${reading.toFixed(1)} ${unit}</td>
+            </tr>
+          `;
+        });
+        tableElement.innerHTML = html;
+      }
+      
+      function updateChartData(distance1, distance2) {
+  const now = new Date();
+  const newDataPoint = {
+    index: state.dataIndex++,
+    distance1: parseFloat(distance1.toFixed(1)),
+    distance2: parseFloat(distance2.toFixed(1)),
+    timestamp: now.toISOString()
+  };
+
+  state.chartData.push(newDataPoint);
+  
+  // Limiter à 1000 points max pour la performance
+  if (state.chartData.length > 1000) {
+    state.chartData.shift();
+  }
+
+  saveToLocalStorage();
+
+  // Mettre à jour le graphique seulement si la section d'eau est visible
+  if (state.activeSection === 'water-section') {
+    renderChart();
+  }
+}
+// Remplacez les fonctions renderChart et updateChartData de votre code par celles-ci
+
+// Variable globale pour le graphique
+function renderChart() {
+  const container = document.getElementById('water-level-chart');
+  if (!container) {
+    console.error("Conteneur du graphique non trouvé");
+    return;
+  }
+
+  // Créer un nouvel élément canvas
+  container.innerHTML = '<canvas id="chartCanvas"></canvas>';
+  const ctx = document.getElementById('chartCanvas').getContext('2d');
+
+  // Données formatées pour Chart.js
+  const timeLabels = state.chartData.map(d => {
+    if (d.timestamp) {
+      return new Date(d.timestamp).toLocaleTimeString();
+    }
+    return `Mesure ${d.index}`;
+  });
+  
+  const canal1Data = state.chartData.map(d => d.distance1);
+  const canal2Data = state.chartData.map(d => d.distance2);
+  
+  // Déterminer le niveau d'alerte pour chaque point des deux canaux
+  const canal1Alerts = canal1Data.map(d => getWaterLevelAlert(d));
+  const canal1PointColors = canal1Alerts.map(alert => alert.color);
+  
+  const canal2Alerts = canal2Data.map(d => getWaterLevelAlert(d));
+  const canal2PointColors = canal2Alerts.map(alert => alert.color);
+
+  // Détruire l'ancien graphique s'il existe
+  if (chart) {
+    chart.destroy();
+  }
+
+  // AJOUT: Créer un plugin pour afficher les niveaux d'alerte pour les deux canaux
+  const levelLabelPlugin = {
+    id: 'levelLabels',
+    afterDatasetsDraw: function(chart) {
+      const ctx = chart.ctx;
+      
+      // Pour chaque dataset (canal)
+      chart.data.datasets.forEach((dataset, datasetIndex) => {
+        const datasetMeta = chart.getDatasetMeta(datasetIndex);
+        
+        if (!datasetMeta || !datasetMeta.data) return; // Protection
+        
+        // Parcourir chaque point du dataset
+        datasetMeta.data.forEach((point, index) => {
+          // Vérifier que le point est visible
+          if (point && !point.skip) {
+            // Obtenir la valeur associée au point
+            const value = chart.data.datasets[datasetIndex].data[index];
+            
+            // Obtenir le niveau d'alerte
+            const alertInfo = getWaterLevelAlert(value);
+            
+            // Ne pas afficher l'étiquette pour tous les points (pour éviter l'encombrement)
+            if (index % 3 === 0 || alertInfo.status === 'Critique') {
+              // Configurer le style du texte
+              ctx.font = 'bold 11px Arial';
+              ctx.textAlign = 'center';
+              
+              // Dessiner un fond blanc semi-transparent pour meilleure lisibilité
+              const text = alertInfo.status;
+              const textWidth = ctx.measureText(text).width;
+              
+              // Position verticale différente selon le canal pour éviter le chevauchement
+              const yOffset = datasetIndex === 0 ? -15 : 15;
+              
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+              ctx.fillRect(point.x - textWidth/2 - 3, point.y + yOffset - 9, textWidth + 6, 16);
+              
+              // Dessiner le texte
+              ctx.fillStyle = alertInfo.color;
+              ctx.fillText(text, point.x, point.y + yOffset);
+            }
+          }
+        });
+      });
+    }
+  };
+
+  // Enregistrer le plugin
+  Chart.register(levelLabelPlugin);
+
+  try {
+    // Configuration du graphique avec zoom et couleurs
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: timeLabels,
+        datasets: [
+          {
+            label: 'Canal 1 (cm)',
+            data: canal1Data,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 2,
+            tension: 0.1,
+            pointRadius: 5,
+            pointBackgroundColor: canal1PointColors,
+            pointBorderColor: 'white',
+            pointBorderWidth: 1.5,
+          },
+          {
+            label: 'Canal 2 (cm)',
+            data: canal2Data,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 2,
+            tension: 0.1,
+            pointRadius: 5,
+            pointBackgroundColor: canal2PointColors,
+            pointBorderColor: 'white',
+            pointBorderWidth: 1.5,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+          duration: 500
+        },
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
+                }
+                if (context.parsed.y !== null) {
+                  label += context.parsed.y.toFixed(1) + ' cm';
+                  
+                  // Ajouter l'indication du niveau d'alerte pour les deux canaux
+                  const alertInfo = getWaterLevelAlert(context.parsed.y);
+                  label += ` (${alertInfo.status}, niveau d'eau: ${alertInfo.value.toFixed(1)} cm)`;
+                }
+                return label;
+              }
+            }
+          },
+          zoom: {
+            pan: {
+              enabled: true,
+              mode: 'x',
+              threshold: 5
+            },
+            zoom: {
+              wheel: {
+                enabled: true,
+              },
+              pinch: {
+                enabled: true
+              },
+              mode: 'x',
+              speed: 0.1
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            title: {
+              display: true,
+              text: 'Niveau d\'eau (cm)'
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: 'Temps'
+            }
+          }
+        }
+      }
+    });
+    
+    // Après que le graphique est créé, ajoutons les zones de couleur manuellement
+    const drawZones = function() {
+      if (!chart) return;
+      
+      const chartArea = chart.chartArea;
+      const yAxis = chart.scales.y;
+      const ctx = chart.ctx;
+      
+      // Définir nos seuils en fonction de la configuration du capteur
+      const SENSOR_HEIGHT = 50;
+      const normalY = yAxis.getPixelForValue(SENSOR_HEIGHT - 20); // Seuil normal
+      const warningY = yAxis.getPixelForValue(SENSOR_HEIGHT - 35); // Seuil d'avertissement
+      
+      // Dessiner des lignes horizontales pour les seuils
+      ctx.save();
+      
+      // Zone critique (rouge)
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.1)';
+      ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, warningY - chartArea.top);
+      
+      // Zone d'avertissement (jaune)
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.1)';
+      ctx.fillRect(chartArea.left, warningY, chartArea.right - chartArea.left, normalY - warningY);
+      
+      // Zone normale (verte)
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.1)';
+      ctx.fillRect(chartArea.left, normalY, chartArea.right - chartArea.left, chartArea.bottom - normalY);
+      
+      // Lignes de seuil
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(chartArea.left, warningY);
+      ctx.lineTo(chartArea.right, warningY);
+      ctx.stroke();
+      
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.7)';
+      ctx.beginPath();
+      ctx.moveTo(chartArea.left, normalY);
+      ctx.lineTo(chartArea.right, normalY);
+      ctx.stroke();
+      
+      ctx.restore();
+    };
+    
+    // Dessiner après le rendu initial
+    chart.options.plugins.afterRender = drawZones;
+    
+    // Et aussi après chaque mise à jour
+    chart.options.plugins.afterUpdate = drawZones;
+    
+  } catch (error) {
+    console.error("Erreur lors de la création du graphique:", error);
+    container.innerHTML = `<div class="bg-red-50 p-4 rounded-lg text-red-600">
+      <p><i class="fas fa-exclamation-triangle"></i> Erreur de graphique: ${error.message}</p>
+    </div>`;
+  }
+}
+
+
+
+// Fonction optimisée pour mettre à jour les données du graphique
+ function updateChartData(distance1, distance2) {
+  const now = new Date();
+  const newDataPoint = {
+    index: state.dataIndex++,
+    distance1: parseFloat(distance1.toFixed(1)),
+    distance2: parseFloat(distance2.toFixed(1)),
+    timestamp: now.toISOString()
+  };
+
+  state.chartData.push(newDataPoint);
+  
+  // Limiter à 1000 points max pour la performance
+  if (state.chartData.length > 1000) {
+    state.chartData.shift();
+  }
+
+  // Vérifier et supprimer les données de plus de 24h
+  cleanupOldData();
+
+  saveToLocalStorage();
+
+  // Si le graphique existe déjà et que nous sommes dans la section eau
+  if (chart && state.activeSection === 'water-section') {
+    // Ajouter les nouvelles données
+    chart.data.labels.push(new Date(now).toLocaleTimeString());
+    chart.data.datasets[0].data.push(distance1);
+    chart.data.datasets[1].data.push(distance2);
+    
+    // Limiter l'affichage aux 50 derniers points pour la lisibilité
+    if (chart.data.labels.length > 50) {
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
+      chart.data.datasets[1].data.shift();
+    }
+    
+    // Mettre à jour le graphique
+    chart.update();
+  } else if (state.activeSection === 'water-section') {
+    // Créer le graphique si nous sommes dans la section eau
+    renderChart();
+  }
+}
+      
+      // DOM elements - ASSUREZ-VOUS QUE LE DOM EST BIEN CHARGÉ AVANT D'ACCÉDER À CES ÉLÉMENTS
+      const elements = {
+        sections: {
+          'water-section': document.getElementById('water-section'),
+          'temperature-section': document.getElementById('temperature-section'),
+          'humidity-section': document.getElementById('humidity-section')
+        },
+        navLinks: document.querySelectorAll('.nav-link'),
+        connectionStatus: document.getElementById('connection-status'),
+        distance1: document.getElementById('distance1'),
+        distance2: document.getElementById('distance2'),
+        flow1: document.getElementById('flow1'),
+        flow2: document.getElementById('flow2'),
+        soilTemperature: document.getElementById('soilTemperature'),
+        soilHumidity: document.getElementById('soilHumidity'),
+        flow1History: document.getElementById('flow1-history'),
+        flow2History: document.getElementById('flow2-history'),
+        temperatureHistory: document.getElementById('temperature-history'),
+        humidityHistory: document.getElementById('humidity-history'),
+        waterLevelChart: document.getElementById('water-level-chart')
+      };
+      
+      // Constants
+      const MAX_HISTORY = 10;
+
+
+    // Zoom chart functions
+    function zoomChart(factor) {
+  if (!chart || !chart.zoom) {
+    console.warn("Fonction de zoom non disponible");
+    return;
+  }
+  
+  try {
+    chart.zoom(1 + factor);
+    state.zoomLevel *= (1 + factor);
+  } catch (e) {
+    console.warn("Erreur lors du zoom:", e);
+  }
+}
+
+function resetZoom() {
+  if (!chart || !chart.resetZoom) {
+    console.warn("Fonction de réinitialisation de zoom non disponible");
+    return;
+  }
+  
+  try {
+    chart.resetZoom();
+    state.zoomLevel = 1;
+  } catch (e) {
+    console.warn("Erreur lors de la réinitialisation du zoom:", e);
+    // Fallback: recréer le graphique
+    setTimeout(renderChart, 100);
+  }
+}
+
+
+     // Fonctions d'export
+      function exportData(format = 'xlsx') {
+        if (state.chartData.length === 0) {
+          alert("Aucune donnée à exporter");
+          return;
+        }
+      
+        if (format === 'xlsx') {
+          exportToExcel();
+        } else if (format === 'pdf') {
+          exportToPDF();
+        }
+      }
+      
+      function exportToExcel() {
+        try {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const content = convertToExcel(state.chartData);
+          
+          if (!content) {
+            alert("Erreur lors de la génération du fichier Excel");
+            return;
+          }
+      
+          const blob = new Blob([content], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `mesures_eau_${timestamp}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, 100);
+        } catch (e) {
+          console.error("Erreur lors de l'export Excel", e);
+          alert("Une erreur est survenue lors de l'export");
+        }
+      }
+      
+      function exportToPDF() {
+  try {
+    if (state.chartData.length === 0) {
+      alert("Aucune donnée à exporter");
+      return;
+    }
+
+    if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
+      alert("La fonction PDF nécessite la librairie jsPDF. Chargement en cours...");
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Titre
+    doc.setFontSize(18);
+    doc.text('Historique des mesures hydrométriques', 14, 15);
+    
+    // Date d'extraction
+    doc.setFontSize(10);
+    doc.text(`Exporté le: ${new Date().toLocaleString()} (données conservées 24h)`, 14, 25);
+    
+    // Entêtes de tableau
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('Index', 14, 35);
+    doc.text('Heure', 40, 35);
+    doc.text('Canal 1 (cm)', 80, 35);
+    doc.text('Canal 2 (cm)', 120, 35);
+    
+    // Données
+    doc.setFont(undefined, 'normal');
+    let y = 45;
+    state.chartData.forEach(item => {
+      if (y > 280) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(item.index.toString(), 14, y);
+      doc.text(item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'N/A', 40, y);
+      doc.text(item.distance1.toFixed(1), 80, y);
+      doc.text(item.distance2.toFixed(1), 120, y);
+      y += 10;
+    });
+    
+    doc.save(`mesures_eau_${new Date().toISOString().slice(0,10)}.pdf`);
+  } catch (e) {
+    console.error("Erreur lors de l'export PDF", e);
+    alert("Une erreur est survenue lors de l'export PDF");
+  }
+} 
+   
+function convertToExcel(data) {
+        if (!data || data.length === 0) return null;
+        
+        try {
+          const worksheet = XLSX.utils.json_to_sheet(data.map(item => ({
+            'Index': item.index,
+            'Heure': item.timestamp || '',
+            'Canal 1 (cm)': item.distance1,
+            'Canal 2 (cm)': item.distance2
+          })));
+      
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, "Mesures_eau");
+          
+          return XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        } catch (e) {
+          console.error("Erreur de conversion Excel", e);
+          return null;
+        }
+      }
+      
+      // Fonction pour exporter l'image du graphique
+function exportChartImage() {
+  if (!chart) {
+    alert("Graphique non disponible");
+    return;
+  }
+  
+  try {
+    // Récupérer l'URL de l'image depuis le canvas
+    const canvas = document.querySelector('#water-level-chart canvas');
+    const imageURL = canvas.toDataURL('image/png');
+    
+    // Créer un lien de téléchargement
+    const link = document.createElement('a');
+    link.href = imageURL;
+    link.download = 'niveau-eau-' + new Date().toISOString().slice(0, 10) + '.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (e) {
+    console.error("Erreur lors de l'export de l'image:", e);
+    alert("Erreur lors de l'export de l'image");
+  }
+}
+   
+
+// Gestion de l'historique complet
+function showFullHistory() {
+  if (state.chartData.length === 0) {
+    alert("Aucun historique disponible");
+    return;
+  }
+
+  const now = new Date();
+  
+  // Créer la modal avec une structure optimisée pour le défilement
+  const modal = document.createElement('div');
+  modal.className = 'fixed inset-0 z-50';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.75)';
+  modal.style.display = 'flex';
+  modal.style.alignItems = 'center';
+  modal.style.justifyContent = 'center';
+  modal.style.overflow = 'auto';
+  modal.style.padding = '1rem';
+  
+  // HTML de la modal
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg w-11/12 max-w-4xl" style="max-height: 85vh; display: flex; flex-direction: column;">
+      <div class="p-4 border-b sticky top-0 bg-white z-10 flex justify-between items-center">
+        <h3 class="text-xl font-bold">Historique complet (${state.chartData.length} mesures)</h3>
+        <button id="close-history-modal" class="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div style="overflow-y: auto; flex-grow: 1; max-height: calc(85vh - 160px);">
+        <table class="w-full">
+          <thead class="sticky top-0 bg-gray-100 z-10">
+            <tr>
+              <th class="p-2 text-left border-b border-gray-200">#</th>
+              <th class="p-2 text-left border-b border-gray-200">Heure</th>
+              <th class="p-2 text-left border-b border-gray-200">Temps écoulé</th>
+              <th class="p-2 text-left border-b border-gray-200">Canal 1 (cm)</th>
+              <th class="p-2 text-left border-b border-gray-200">Niveau 1</th>
+              <th class="p-2 text-left border-b border-gray-200">Débit 1 (m³/s)</th>
+              <th class="p-2 text-left border-b border-gray-200">Canal 2 (cm)</th>
+              <th class="p-2 text-left border-b border-gray-200">Niveau 2</th>
+              <th class="p-2 text-left border-b border-gray-200">Débit 2 (m³/s)</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body">
+            <!-- Le contenu du tableau sera inséré ici dynamiquement -->
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="p-4 border-t mt-auto bg-white">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm text-gray-500">
+            <i class="fas fa-info-circle"></i> Les données sont conservées pendant 24 heures
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="flex items-center">
+              <span class="inline-block w-3 h-3 rounded-full bg-emerald-500 mr-1"></span>
+              <span class="text-xs">Normal</span>
+            </div>
+            <div class="flex items-center">
+              <span class="inline-block w-3 h-3 rounded-full bg-amber-500 mr-1"></span>
+              <span class="text-xs">Attention</span>
+            </div>
+            <div class="flex items-center">
+              <span class="inline-block w-3 h-3 rounded-full bg-red-500 mr-1"></span>
+              <span class="text-xs">Critique</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Ajouter la modal au body
+  document.body.appendChild(modal);
+  document.body.style.overflow = 'hidden'; // Bloquer le défilement de la page
+  
+  // Référence au corps du tableau
+  const tableBody = document.getElementById('history-table-body');
+  
+  // Générer les lignes du tableau - technique d'insertion optimisée pour les grandes quantités de données
+  let tableContent = '';
+  state.chartData.forEach(d => {
+    let timeElapsed = '';
+    if (d.timestamp) {
+      const dataTime = new Date(d.timestamp);
+      const diffMs = now - dataTime;
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMins / 60);
+      
+      if (diffHours > 0) {
+        timeElapsed = `${diffHours}h ${diffMins % 60}m`;
+      } else {
+        timeElapsed = `${diffMins}m`;
+      }
+    }
+    
+    // Calculer les débits à partir des niveaux d'eau
+    const flow1 = calculateFlow(d.distance1);
+    const flow2 = calculateFlow(d.distance2);
+    
+    // Obtenir les infos d'alerte pour chaque canal
+    const alert1 = getWaterLevelAlert(d.distance1);
+    const alert2 = getWaterLevelAlert(d.distance2);
+    
+    tableContent += `
+      <tr class="border-b border-gray-200 hover:bg-gray-50">
+        <td class="p-3">${d.index}</td>
+        <td class="p-3">${d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : 'N/A'}</td>
+        <td class="p-3">${timeElapsed}</td>
+        <td class="p-3">${d.distance1.toFixed(1)}</td>
+        <td class="p-3">
+          <span class="px-2 py-1 rounded-full text-xs font-medium ${alert1.bgColor} ${alert1.textColor}">
+            ${alert1.status} (${alert1.value.toFixed(1)} cm)
+          </span>
+        </td>
+        <td class="p-3">${flow1.toFixed(1)}</td>
+        <td class="p-3">${d.distance2.toFixed(1)}</td>
+        <td class="p-3">
+          <span class="px-2 py-1 rounded-full text-xs font-medium ${alert2.bgColor} ${alert2.textColor}">
+            ${alert2.status} (${alert2.value.toFixed(1)} cm)
+          </span>
+        </td>
+        <td class="p-3">${flow2.toFixed(1)}</td>
+      </tr>
+    `;
+  });
+  
+  // Insérer le contenu dans le tableau
+  tableBody.innerHTML = tableContent;
+  
+  // Gérer la fermeture de la modal
+  document.getElementById('close-history-modal').addEventListener('click', function() {
+    document.body.removeChild(modal);
+    document.body.style.overflow = ''; // Restaurer le défilement
+  });
+  
+  // Fermer la modal en cliquant en dehors du contenu
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) {
+      document.body.removeChild(modal);
+      document.body.style.overflow = ''; // Restaurer le défilement
+    }
+  });
+}
+
+// Démarrer l'application quand le DOM est prêt
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM chargé, démarrage de l'application...");
+        // Petit délai pour être sûr que tout est chargé
+        setTimeout(initApp, 300);
+      });  
     </script>
-</body>
+    </body>
 </html>
